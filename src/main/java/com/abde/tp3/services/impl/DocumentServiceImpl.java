@@ -1,4 +1,4 @@
-package com.abde.tp3.services;
+package com.abde.tp3.services.impl;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -12,21 +12,27 @@ import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 
-import org.springframework.core.io.FileSystemResource;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.abde.tp3.model.Document;
 import com.abde.tp3.repos.DocumentRepository;
+import com.abde.tp3.services.DocumentService;
 
 @Service
 public class DocumentServiceImpl implements DocumentService {
   private final DocumentRepository documentRepository;
   final String HOME = System.getProperty("user.home");
-  final String fileuploads = "\\fileuploads";
+  final String uploadsDir = "uploads";
 
   DocumentServiceImpl(DocumentRepository documentRepository) {
     this.documentRepository = documentRepository;
+  }
+
+  @Override
+  public Optional<Document> getDocument(Long id) {
+    // TODO Auto-generated method stub
+    return documentRepository.findById(id);
   }
 
   @Override
@@ -34,18 +40,20 @@ public class DocumentServiceImpl implements DocumentService {
     Optional<Document> document = documentRepository.findById(id);
     if (document.isPresent()) {
       documentRepository.deleteById(id);
+      deleteFileFromFS(document.get().getPath());
       return document.get();
     }
     return null;
   }
 
   @Override
-  public FileSystemResource downloaDocument(Long id) {
+  public byte[] downloaDocument(Long id) {
     Optional<Document> document = documentRepository.findById(id);
     if (document.isPresent()) {
-      FileSystemResource fileSystemResource = new FileSystemResource(
-          HOME + fileuploads + "\\" + document.get().getPath());
-      return fileSystemResource;
+      // FileSystemResource fileSystemResource = new FileSystemResource(
+      // HOME + uploadsDir + "\\" + document.get().getPath());
+      // return fileSystemResource;
+      return downlodMultipartFile(HOME + "\\" + uploadsDir + "\\" + document.get().getPath());
     }
     return null;
 
@@ -63,6 +71,7 @@ public class DocumentServiceImpl implements DocumentService {
     document.setFileSize(file.getSize());
     document.setType(file.getContentType());
     document.setPath(generateFilePath(file.getOriginalFilename()));
+    documentRepository.save(document);
     saveToFileSystem(file);
     return document;
   }
@@ -83,19 +92,24 @@ public class DocumentServiceImpl implements DocumentService {
   }
 
   private String saveToFileSystem(MultipartFile file) {
-    final String filename = "\\" + generateFilePath(file.getOriginalFilename());
-    final File file2 = new File(filename);
-    try (FileOutputStream fileOutputStream = new FileOutputStream(file2)) {
-      Path uploads = Paths.get(fileuploads);
+    final String filename = generateFilePath(file.getOriginalFilename());
+    final File file2 = new File(HOME + "\\" + uploadsDir, filename);
+    try {
+      Path uploads = Paths.get(HOME, uploadsDir);
+      System.out.println(uploads.getFileName().toString());
       if (Files.notExists(uploads)) {
-        Files.createTempDirectory(fileuploads);
+        Files.createDirectory(uploads);
       }
-      Path filePath = Paths.get(HOME + fileuploads + filename);
-      if (Files.notExists(filePath)) {
-        Files.createFile(filePath);
+      try (FileOutputStream fileOutputStream = new FileOutputStream(file2)) {
+        Path filePath = Paths.get(HOME + "\\" + uploadsDir + "\\" + filename);
+        if (Files.notExists(filePath)) {
+          System.out.println("File Path: " + filePath);
+          Files.createFile(filePath);
+        }
+        fileOutputStream.write(file.getBytes());
+      } catch (IOException e) {
+        e.printStackTrace();
       }
-      fileOutputStream.write(file.getBytes());
-
     } catch (IOException e) {
       e.printStackTrace();
     }
@@ -116,15 +130,25 @@ public class DocumentServiceImpl implements DocumentService {
   public Document updateDoc(MultipartFile file, Long id) {
     Optional<Document> document = documentRepository.findById(id);
     if (document.isPresent()) {
-      try (FileOutputStream fileOutputStream = new FileOutputStream(
-          new File(HOME + fileuploads + "\\" + document.get().getPath()))) {
-        fileOutputStream.write(file.getBytes());
-      } catch (IOException e) {
-        // TODO: handle exception
-        e.printStackTrace();
-      }
+      deleteFileFromFS(document.get().getPath());
+      document.get().setFileName(file.getOriginalFilename());
+      document.get().setFileSize(file.getSize());
+      document.get().setPath(generateFilePath(file.getOriginalFilename()));
+      document.get().setType(file.getContentType());
+      documentRepository.save(document.get());
+      saveToFileSystem(file);
       return document.get();
     }
     return null;
+  }
+
+  void deleteFileFromFS(String path) {
+    Path deletePath = Paths.get(HOME, new String[] { uploadsDir, path });
+    try {
+      Files.delete(deletePath);
+
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
   }
 }

@@ -1,6 +1,7 @@
 package com.abde.tp3.services;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.web.multipart.MultipartFile;
@@ -12,7 +13,9 @@ public interface DocumentService {
 
   List<Document> getAllDocuments();
 
-  FileSystemResource downloaDocument(Long id);
+  Optional<Document> getDocument(Long id);
+
+  byte[] downloaDocument(Long id);
 
   Document deleteDocument(Long id);
 }
