@@ -8,40 +8,61 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 
+import jakarta.transaction.Transactional;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.abde.tp3.model.Document;
+import com.abde.tp3.model.User;
 import com.abde.tp3.repos.DocumentRepository;
+import com.abde.tp3.repos.UserRepo;
 import com.abde.tp3.services.DocumentService;
 
+import lombok.AllArgsConstructor;
+import lombok.Data;
+
+@Slf4j
 @Service
+@Data
+@AllArgsConstructor
+@Transactional
 public class DocumentServiceImpl implements DocumentService {
   private final DocumentRepository documentRepository;
+  private final UserRepo userRepo;
   final String HOME = System.getProperty("user.home");
   final String uploadsDir = "uploads";
 
-  DocumentServiceImpl(DocumentRepository documentRepository) {
-    this.documentRepository = documentRepository;
-  }
-
   @Override
   public Optional<Document> getDocument(Long id) {
-    // TODO Auto-generated method stub
-    return documentRepository.findById(id);
+    Optional<Document> document = documentRepository.findById(id);
+    UserDetails userDetails = (UserDetails) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+    if (document.isPresent() && userDetails != null) {
+      if (document.get().getUser().getEmail().equals(userDetails.getUsername()))
+        return document;
+    }
+    return null;
   }
 
   @Override
   public Document deleteDocument(Long id) {
     Optional<Document> document = documentRepository.findById(id);
-    if (document.isPresent()) {
-      documentRepository.deleteById(id);
-      deleteFileFromFS(document.get().getPath());
-      return document.get();
+    UserDetails userDetails = (UserDetails) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+    if (document.isPresent() && userDetails != null) {
+      if (document.get().getUser().getEmail().equals(userDetails.getUsername())) {
+        User user = userRepo.findUserByEmail(userDetails.getUsername());
+        documentRepository.deleteById(id);
+        deleteFileFromFS(document.get().getPath());
+        user.setDocumentCount(user.getDocumentCount() - 1);
+        return document.get();
+      }
     }
     return null;
   }
@@ -49,11 +70,10 @@ public class DocumentServiceImpl implements DocumentService {
   @Override
   public byte[] downloaDocument(Long id) {
     Optional<Document> document = documentRepository.findById(id);
-    if (document.isPresent()) {
-      // FileSystemResource fileSystemResource = new FileSystemResource(
-      // HOME + uploadsDir + "\\" + document.get().getPath());
-      // return fileSystemResource;
-      return downlodMultipartFile(HOME + "\\" + uploadsDir + "\\" + document.get().getPath());
+    UserDetails userDetails = (UserDetails) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+    if (document.isPresent() && userDetails != null) {
+      if (document.get().getUser().getEmail().equals(userDetails.getUsername()))
+        return downlodMultipartFile(HOME + "\\" + uploadsDir + "\\" + document.get().getPath());
     }
     return null;
 
@@ -61,19 +81,36 @@ public class DocumentServiceImpl implements DocumentService {
 
   @Override
   public List<Document> getAllDocuments() {
-    return documentRepository.findAll();
+    UserDetails userDetails = (UserDetails) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+    log.info("UserDetails: " + userDetails.getUsername());
+    if (userDetails != null) {
+//      User user= userRepo.findUserByEmail(userDetails.getUsername());
+      return documentRepository.findDocumentsByUserEmail(userDetails.getUsername());
+    }
+    return new ArrayList<>();
   }
 
   @Override
-  public Document uploadDocument(MultipartFile file) {
-    Document document = new Document();
-    document.setFileName(file.getOriginalFilename());
-    document.setFileSize(file.getSize());
-    document.setType(file.getContentType());
-    document.setPath(generateFilePath(file.getOriginalFilename()));
-    documentRepository.save(document);
-    saveToFileSystem(file);
-    return document;
+  public Document uploadDocument(MultipartFile file, String description) {
+    UserDetails userDetails = (UserDetails) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+    if (userDetails != null) {
+
+      User user = userRepo.findUserByEmail(userDetails.getUsername());
+      Document document = new Document();
+      document.setFileName(file.getOriginalFilename());
+      document.setFileSize(file.getSize());
+      document.setType(file.getContentType());
+      document.setPath(generateFilePath(file.getOriginalFilename()));
+      document.setUser(user);
+      document.setDescription(description);
+      log.info("Before saving User updates into the DB: count: "+user.getDocumentCount());
+      documentRepository.save(document);
+      saveToFileSystem(file);
+      user.setDocumentCount(user.getDocumentCount() + 1);
+      userRepo.save(user);
+      return document;
+    }
+    return null;
   }
 
   private String generateFilePath(String filename) {
@@ -129,15 +166,18 @@ public class DocumentServiceImpl implements DocumentService {
 
   public Document updateDoc(MultipartFile file, Long id) {
     Optional<Document> document = documentRepository.findById(id);
-    if (document.isPresent()) {
-      deleteFileFromFS(document.get().getPath());
-      document.get().setFileName(file.getOriginalFilename());
-      document.get().setFileSize(file.getSize());
-      document.get().setPath(generateFilePath(file.getOriginalFilename()));
-      document.get().setType(file.getContentType());
-      documentRepository.save(document.get());
-      saveToFileSystem(file);
-      return document.get();
+    UserDetails userDetails = (UserDetails) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+    if (document.isPresent() && userDetails != null) {
+      if (document.get().getUser().getEmail().equals(userDetails.getUsername())) {
+        deleteFileFromFS(document.get().getPath());
+        document.get().setFileName(file.getOriginalFilename());
+        document.get().setFileSize(file.getSize());
+        document.get().setPath(generateFilePath(file.getOriginalFilename()));
+        document.get().setType(file.getContentType());
+        documentRepository.save(document.get());
+        saveToFileSystem(file);
+        return document.get();
+      }
     }
     return null;
   }

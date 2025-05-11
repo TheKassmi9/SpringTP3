@@ -18,12 +18,13 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Component
+@Slf4j
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
-  @Autowired
   private final JwtService jwtService;
-  @Autowired
   private final ApplicationContext context;
 
   JwtAuthenticationFilter(JwtService jwtService, ApplicationContext context) {
@@ -34,23 +35,46 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
   @Override
   protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
       throws ServletException, IOException {
+//    log.info("In doFilterInternal: "+ SecurityContextHolder.getContext().getAuthentication().toString());
+//    System.out.println("the user has not been authenticated yet");
+//    System.out.println("JWT FILTER: " + SecurityContextHolder.getContext().getAuthentication().getPrincipal());
+    String requestURI = request.getRequestURI();
+    if(requestURI.startsWith("/api/auth/")) {
+      System.out.println("requestURI: " + requestURI);
+      filterChain.doFilter(request, response);
+      return;
+    }
+    SecurityContextHolder.clearContext();
     String authorizationHeader = request.getHeader("Authorization");
     String token = null;
     String username = null;
     if (authorizationHeader != null && authorizationHeader.startsWith("Bearer ")) {
       token = authorizationHeader.substring(7);
       username = jwtService.extractUsername(token);
+      if(username != null) {
+        log.info("username found: " + username);
+      }
+    }
+    else {
+      filterChain.doFilter(request, response);
+      return;
     }
     UserDetails userDetails = context.getBean(CustomUserDetailsService.class).loadUserByUsername(username);
-    if (username != null && !SecurityContextHolder.getContext().getAuthentication().isAuthenticated()) {
+    log.info("userdetails.username "+ userDetails.getUsername());
+    log.info(("username: "+ username));
+    if (username != null) {
+      log.info("Is Token Valid: "+ jwtService.validateToken(token, userDetails));
       if (jwtService.validateToken(token, userDetails)) {
-        UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(username, null,
+        log.info("token validated");
+        UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(userDetails, null,
             userDetails.getAuthorities());
         authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
         SecurityContextHolder.getContext().setAuthentication(authentication);
+        log.info("Authentication Success: "+ authentication.isAuthenticated());
+        filterChain.doFilter(request, response);
       }
-    }
-    filterChain.doFilter(request, response);
+    } else
+      filterChain.doFilter(request, response);
   }
 
 }

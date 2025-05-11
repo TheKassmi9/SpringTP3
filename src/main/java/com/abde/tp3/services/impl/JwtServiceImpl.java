@@ -8,6 +8,7 @@ import java.util.function.Function;
 
 import javax.crypto.SecretKey;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
@@ -21,6 +22,7 @@ import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import lombok.AllArgsConstructor;
 
+@Slf4j
 @Service
 @AllArgsConstructor
 public class JwtServiceImpl implements JwtService {
@@ -29,7 +31,7 @@ public class JwtServiceImpl implements JwtService {
 
   @Override
   public String generateToken(String username) {
-    UserDetails userDetails = new UserPrincipale(userRepo.findByEmail(username));
+    UserDetails userDetails = new UserPrincipale(userRepo.findUserByEmail(username));
     return generateToken(userDetails);
   }
 
@@ -51,6 +53,8 @@ public class JwtServiceImpl implements JwtService {
 
   @Override
   public boolean validateToken(String token, UserDetails userDetails) {
+    log.info(("token username: "+ extractUsername(token)));
+    log.info("is token expired: "+ isTokenExpired(token));
     return extractUsername(token).equals(userDetails.getUsername()) && !isTokenExpired(token);
   }
 
@@ -77,7 +81,7 @@ public class JwtServiceImpl implements JwtService {
 
   @Override
   public boolean isTokenExpired(String token) {
-    return extractClaim(token, Claims::getIssuedAt).before(new Date());
+    return extractClaim(token, Claims::getExpiration).before(new Date());
   }
 
   @Override

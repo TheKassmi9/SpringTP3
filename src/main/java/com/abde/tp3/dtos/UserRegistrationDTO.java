@@ -1,5 +1,10 @@
 package com.abde.tp3.dtos;
 
-public record UserRegistrationDTO(String username, String password, String email) {
+import lombok.AllArgsConstructor;
+import lombok.Data;
 
+@Data
+@AllArgsConstructor
+public class UserRegistrationDTO {
+  private String username, password, email;
 }

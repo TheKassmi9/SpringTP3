@@ -4,6 +4,7 @@ import java.util.Collection;
 import java.util.stream.Collector;
 import java.util.stream.Collectors;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -15,13 +16,16 @@ import lombok.Data;
 @Data
 @AllArgsConstructor
 @Builder
+@Slf4j
 public class UserPrincipale implements UserDetails {
   final private User user;
 
   @Override
   public Collection<? extends GrantedAuthority> getAuthorities() {
-    return this.user.getRoles().stream().map(role -> new SimpleGrantedAuthority(role.name()))
-        .collect(Collectors.toList());
+//    return this.user.getRoles().stream().map(role -> new SimpleGrantedAuthority(role.getRole()))
+//        .collect(Collectors.toList());
+    log.info("getAuthorities: ");
+    return this.user.getRoles().stream().map(role ->new SimpleGrantedAuthority(role.getRole())).collect(Collectors.toList());
   }
 
   @Override

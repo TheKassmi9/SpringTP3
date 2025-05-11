@@ -25,11 +25,13 @@ public class UserController {
   // @PostMapping("/register")
   @PostMapping("/register")
   ResponseEntity<UserDTO> register(@RequestBody UserRegistrationDTO user) {
+    System.out.println("User Data: " + user.getPassword());
     return ResponseEntity.status(HttpStatus.CREATED).body(userService.register(user));
   }
 
   @PostMapping("/login")
   ResponseEntity<String> login(@RequestBody LoginRequestDTO login) {
+    System.out.println("Login Data: " + login.email() + " " + login.password());
     return ResponseEntity.ok().body(userService.loginUser(login));
   }
 

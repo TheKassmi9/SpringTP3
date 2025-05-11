@@ -36,12 +36,13 @@ public class DocumentController {
   }
 
   @PostMapping(value = "/document/upload")
-  public ResponseEntity<Document> upload(@RequestPart("file") MultipartFile file) throws URISyntaxException {
-    return ResponseEntity.created(URI.create("/document/docId")).body(documentServiceImpl.uploadDocument(file));
+  public ResponseEntity<Document> upload(@RequestPart("file") MultipartFile file, @RequestPart("description") String description) throws URISyntaxException {
+    return ResponseEntity.created(URI.create("/document/docId")).body(documentServiceImpl.uploadDocument(file, description));
   }
 
   @GetMapping("/documents")
   public ResponseEntity<List<Document>> getDocs() {
+    System.out.println("visited /documents route");
     return ResponseEntity.ok().body(documentServiceImpl.getAllDocuments());
   }
 

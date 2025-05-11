@@ -6,22 +6,13 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import jakarta.persistence.*;
+import org.hibernate.annotations.CreationTimestamp;
 import org.springframework.data.annotation.CreatedDate;
 
 import com.abde.tp3.Enums.Roles;
 
-import jakarta.persistence.CascadeType;
-import jakarta.persistence.CollectionTable;
-import jakarta.persistence.Column;
-import jakarta.persistence.ElementCollection;
-import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.OneToMany;
-import jakarta.persistence.Table;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -30,32 +21,35 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "users")
+@Table(name = "app_user")
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
 public class User {
   @Id
-  @GeneratedValue(strategy = GenerationType.IDENTITY)
-  private UUID id;
+  @SequenceGenerator(name = "user_sequence", sequenceName = "user_sequence",
+  allocationSize = 1)
+  @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "user_sequence")
+  private Long id;
   @Email
   private String email;
   @NotBlank
   private String username;
   @NotBlank
   @Size(min = 8)
+  @JsonIgnore
   private String password;
   @CreatedDate
+  @Temporal(TemporalType.TIMESTAMP)
+  @CreationTimestamp
+  @Column(name = "created_at", updatable = false,insertable = true, columnDefinition = "timestamp")
   private LocalDateTime createdAt;
-  @ElementCollection
-  @CollectionTable(name = "user_roles", joinColumns = @JoinColumn(name = "user_id")
-
-  )
-  @Column(name = "user_roles")
+  @ElementCollection(fetch = FetchType.EAGER)
+  @CollectionTable(name = "user_roles", joinColumns = @JoinColumn(name = "user_id", referencedColumnName = "id") )
   private List<Roles> roles;
 
-  @OneToMany(mappedBy = "user", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
-  private Set<Document> documents = new HashSet<>();
+  @OneToMany(mappedBy = "user", fetch = FetchType.EAGER, cascade = CascadeType.ALL)
+  private List<Document> documents;
   private Integer documentCount = 0;
 
 }
